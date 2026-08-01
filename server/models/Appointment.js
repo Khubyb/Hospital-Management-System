@@ -12,10 +12,11 @@ const appointmentSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    // Optional: doctors aren't required to have a department assigned anymore,
+    // so an appointment may not have one either.
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',
-      required: true,
     },
     date: {
       type: Date,
@@ -25,7 +26,6 @@ const appointmentSchema = new mongoose.Schema(
     endTime: { type: String, required: true }, // "09:30"
     reasonForVisit: {
       type: String,
-      required: [true, 'Please describe the reason for the visit'],
       maxlength: 500,
     },
     status: {

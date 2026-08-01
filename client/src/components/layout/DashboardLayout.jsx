@@ -1,20 +1,15 @@
-import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaMoon, FaSun, FaRightFromBracket, FaHeartPulse } from 'react-icons/fa6';
+import { FaRightFromBracket, FaHeartPulse } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext.jsx';
+import ThemeToggle from '../ui/ThemeToggle.jsx';
 import { toast } from 'react-toastify';
 
 // Shared shell for Patient and Doctor dashboards: sidebar nav (passed in as
 // `links`), a topbar with dark-mode toggle + logout, and an animated content area.
-const DashboardLayout = ({ links, children, title }) => {
+const DashboardLayout = ({ links, children, title, headerExtra }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-  }, [dark]);
 
   const handleLogout = async () => {
     await logout();
@@ -30,7 +25,7 @@ const DashboardLayout = ({ links, children, title }) => {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-cyan-500">
             <FaHeartPulse className="text-white" />
           </div>
-          <span className="font-display text-lg font-bold text-slate-800 dark:text-white">City Care</span>
+          <span className="font-display text-lg font-bold text-slate-800 dark:text-white">HMS</span>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1">
@@ -68,13 +63,10 @@ const DashboardLayout = ({ links, children, title }) => {
             <h1 className="font-display text-xl font-bold text-slate-800 dark:text-white">{title}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">Welcome back, {user?.fullName?.split(' ')[0]}</p>
           </div>
-          <button
-            onClick={() => setDark((d) => !d)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? <FaSun /> : <FaMoon />}
-          </button>
+          <div className="flex items-center gap-3">
+            {headerExtra}
+            <ThemeToggle />
+          </div>
         </header>
 
         <motion.main

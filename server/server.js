@@ -16,6 +16,7 @@ const authRoutes = require('./routes/authRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -62,9 +63,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // TODO (next iteration): medicalRecordRoutes, prescriptionRoutes, paymentRoutes,
-// notificationRoutes, adminRoutes, reviewRoutes, uploadRoutes
+// notificationRoutes, reviewRoutes, uploadRoutes
 
 app.use(notFound);
 app.use(errorHandler);

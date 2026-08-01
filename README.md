@@ -1,4 +1,4 @@
-# City Care — Hospital Management System (MERN)
+# Hospital Management System (HMS) — MERN
 
 A full-stack Hospital Management System built with MongoDB, Express, React, and Node.js.
 

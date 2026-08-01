@@ -28,6 +28,13 @@ exports.signupPatient = asyncHandler(async (req, res) => {
   const existing = await User.findOne({ email: req.body.email });
   if (existing) throw new ApiError(409, 'An account with this email already exists');
 
+  const emergencyContact = req.body.emergencyContact || {};
+  const cleanedEmergencyContact = {
+    name: emergencyContact.name || undefined,
+    relationship: emergencyContact.relationship || undefined,
+    phone: emergencyContact.phone || undefined,
+  };
+
   const patient = await Patient.create({
     fullName: req.body.fullName,
     email: req.body.email,
@@ -35,9 +42,9 @@ exports.signupPatient = asyncHandler(async (req, res) => {
     phone: req.body.phone,
     dateOfBirth: req.body.dateOfBirth,
     gender: req.body.gender,
-    bloodGroup: req.body.bloodGroup,
+    bloodGroup: req.body.bloodGroup || undefined,
     address: req.body.address,
-    emergencyContact: req.body.emergencyContact,
+    emergencyContact: cleanedEmergencyContact,
     acceptedTerms: req.body.acceptedTerms === 'true' || req.body.acceptedTerms === true,
     role: 'patient',
   });
@@ -75,7 +82,7 @@ exports.signupDoctor = asyncHandler(async (req, res) => {
     specialization: req.body.specialization,
     qualification: req.body.qualification,
     yearsOfExperience: req.body.yearsOfExperience,
-    department: req.body.department,
+    department: req.body.department || undefined,
     profilePicture: req.body.profilePicture || undefined,
     acceptedTerms: req.body.acceptedTerms === 'true' || req.body.acceptedTerms === true,
     role: 'doctor',
@@ -175,6 +182,46 @@ exports.logout = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getMe = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, user: req.user.toSafeObject() });
+});
+
+// Fields any logged-in user may edit about themselves. Deliberately excludes
+// password, role, email-verification, and approval-workflow fields.
+const SELF_EDITABLE_FIELDS = [
+  'fullName',
+  'phone',
+  // patient-only
+  'dateOfBirth',
+  'gender',
+  'bloodGroup',
+  'address',
+  'emergencyContact',
+  // doctor-only
+  'specialization',
+  'qualification',
+  'yearsOfExperience',
+  'consultationFee',
+];
+
+// @desc    Update the logged-in user's own profile info
+// @route   PUT /api/auth/update-profile
+// @access  Private
+exports.updateProfile = asyncHandler(async (req, res) => {
+  // Important: User.findByIdAndUpdate() only knows the base User schema, so
+  // discriminator-only fields (e.g. a doctor's consultationFee) would get
+  // silently stripped by strict-mode casting before the update even runs.
+  // findById() correctly hydrates the document as its real discriminator
+  // type (Doctor/Patient), so assigning + save() respects those fields.
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, 'User not found');
+
+  SELF_EDITABLE_FIELDS.forEach((field) => {
+    if (req.body[field] === undefined) return;
+    user[field] = req.body[field] === '' ? undefined : req.body[field];
+  });
+
+  await user.save();
+
+  res.status(200).json({ success: true, user: user.toSafeObject() });
 });
 
 // @desc    Step 1 of forgot password - request an OTP

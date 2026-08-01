@@ -8,12 +8,26 @@ const Department = require('../models/Department');
 const User = require('../models/User');
 
 const departments = [
-  { name: 'General Medicine', description: 'Checkups and preventive care', icon: 'stethoscope' },
-  { name: 'Cardiology', description: 'Heart health diagnostics and treatment', icon: 'heart-pulse' },
-  { name: 'Neurology', description: 'Brain, spine and nervous system care', icon: 'brain' },
-  { name: 'Orthopedics', description: 'Bone, joint and mobility treatment', icon: 'bone' },
-  { name: 'Pediatrics', description: 'Care for children of all ages', icon: 'child' },
-  { name: 'Dental Care', description: 'Full-service dental and oral health', icon: 'tooth' },
+  { name: 'General Medicine', description: 'Checkups and preventive care', icon: 'general' },
+  { name: 'Cardiology', description: 'Heart health diagnostics and treatment', icon: 'cardiology' },
+  { name: 'Neurology', description: 'Brain, spine and nervous system care', icon: 'neurology' },
+  { name: 'Orthopedics', description: 'Bone, joint and mobility treatment', icon: 'orthopedics' },
+  { name: 'Pediatrics', description: 'Care for children of all ages', icon: 'pediatrics' },
+  { name: 'Dental Care', description: 'Full-service dental and oral health', icon: 'dental' },
+  { name: 'Oncology', description: 'Cancer screening, diagnosis and treatment', icon: 'oncology' },
+  { name: 'Nephrology', description: 'Kidney health and dialysis care', icon: 'nephrology' },
+  { name: 'Psychiatry', description: 'Mental health assessment and treatment', icon: 'psychiatry' },
+  { name: 'Pulmonology', description: 'Lung and respiratory system care', icon: 'pulmonology' },
+  { name: 'Urology', description: 'Urinary tract and male reproductive health', icon: 'urology' },
+  { name: 'Gynecology', description: "Women's reproductive health care", icon: 'gynecology' },
+  { name: 'Dermatology', description: 'Skin, hair and nail conditions', icon: 'dermatology' },
+  { name: 'ENT (Otolaryngology)', description: 'Ear, nose and throat care', icon: 'ent' },
+  { name: 'Gastroenterology', description: 'Digestive system diagnosis and treatment', icon: 'gastroenterology' },
+  { name: 'Endocrinology', description: 'Hormonal and metabolic disorders, including diabetes', icon: 'endocrinology' },
+  { name: 'Ophthalmology', description: 'Complete eye care and vision correction', icon: 'ophthalmology' },
+  { name: 'Emergency Medicine', description: 'Urgent and trauma care around the clock', icon: 'emergency' },
+  { name: 'Radiology', description: 'Diagnostic imaging including X-ray, CT and MRI', icon: 'radiology' },
+  { name: 'Physical Therapy', description: 'Rehabilitation and mobility recovery', icon: 'physiotherapy' },
 ];
 
 const seed = async () => {

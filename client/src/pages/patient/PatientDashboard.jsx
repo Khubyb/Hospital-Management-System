@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { FaCalendarCheck, FaCalendarPlus, FaFileMedical, FaGear, FaHouse } from 'react-icons/fa6';
 import { Routes, Route } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
+import ProfileSettingsForm from '../../components/settings/ProfileSettingsForm.jsx';
 import { appointmentService } from '../../services/authService';
 import BookAppointment from './BookAppointment.jsx';
 
@@ -115,14 +116,65 @@ const Overview = () => {
   );
 };
 
+// Medical Records tab: every appointment the doctor has marked completed,
+// treated as this patient's visit history.
+const MedicalRecords = () => {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    appointmentService
+      .getAll({ status: 'completed' })
+      .then((res) => setAppointments(res.appointments))
+      .catch((err) => toast.error(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-sm text-slate-500">Loading medical records...</p>;
+
+  return (
+    <div className="glass-card p-6">
+      <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold text-slate-800 dark:text-white">
+        <FaFileMedical className="text-primary-600" /> Medical Records
+      </h2>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        A record is added here automatically once a doctor marks your appointment as completed.
+      </p>
+
+      {appointments.length === 0 ? (
+        <p className="text-sm text-slate-500">No completed visits yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {appointments.map((a) => (
+            <div key={a._id} className="rounded-xl border border-slate-100 p-4 dark:border-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium text-slate-800 dark:text-white">Dr. {a.doctor?.fullName}</p>
+                <span className="text-xs font-semibold text-slate-400">{new Date(a.date).toDateString()}</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {a.doctor?.specialization} {a.department?.name ? `· ${a.department.name}` : ''} &middot; {a.startTime}
+              </p>
+              {a.reasonForVisit && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  <span className="font-medium">Reason for visit:</span> {a.reasonForVisit}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const PatientDashboard = () => {
   return (
     <DashboardLayout links={links} title="Patient Dashboard">
       <Routes>
         <Route index element={<Overview />} />
         <Route path="book" element={<BookAppointment />} />
-        <Route path="records" element={<div className="glass-card p-6 text-slate-500">Medical records module — coming in the next build.</div>} />
-        <Route path="settings" element={<div className="glass-card p-6 text-slate-500">Profile settings — coming in the next build.</div>} />
+        <Route path="records" element={<MedicalRecords />} />
+        <Route path="settings" element={<ProfileSettingsForm />} />
       </Routes>
     </DashboardLayout>
   );

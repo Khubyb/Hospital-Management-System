@@ -10,6 +10,7 @@ const {
   login,
   logout,
   getMe,
+  updateProfile,
   forgotPassword,
   resetPassword,
 } = require('../controllers/authController');
@@ -37,6 +38,7 @@ router.post('/resend-otp', authLimiter, resendOTP);
 router.post('/login', authLimiter, loginRules, login);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
+router.put('/update-profile', protect, updateProfile);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password', authLimiter, resetPassword);
 

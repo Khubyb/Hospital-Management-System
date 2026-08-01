@@ -4,6 +4,8 @@ import { toast } from 'react-toastify';
 import { FaCalendarCheck, FaHouse, FaUserGroup, FaGear } from 'react-icons/fa6';
 import { Routes, Route } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
+import ProfileSettingsForm from '../../components/settings/ProfileSettingsForm.jsx';
+import AvailabilityEditor from '../../components/settings/AvailabilityEditor.jsx';
 import { appointmentService } from '../../services/authService';
 
 const links = [
@@ -44,14 +46,18 @@ const Overview = () => {
 
   const pending = appointments.filter((a) => a.status === 'pending');
   const upcoming = appointments.filter((a) => a.status === 'approved');
+  const completed = appointments.filter((a) => a.status === 'completed');
+  const uniquePatients = new Set(appointments.map((a) => a.patient?._id).filter(Boolean));
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {[
-          { label: 'Pending Requests', value: pending.length },
+          { label: 'Total Patients', value: uniquePatients.size },
+          { label: 'Requests Received', value: pending.length },
           { label: 'Upcoming', value: upcoming.length },
-          { label: 'Total', value: appointments.length },
+          { label: 'Completed', value: completed.length },
+          { label: 'Total Appointments', value: appointments.length },
         ].map((s) => (
           <motion.div key={s.label} whileHover={{ y: -4 }} className="glass-card p-5">
             <p className="text-2xl font-bold text-slate-800 dark:text-white">{s.value}</p>
@@ -111,13 +117,83 @@ const Overview = () => {
   );
 };
 
+// Patients tab: groups this doctor's appointments by patient so they can see,
+// at a glance, who's requested, who's upcoming, and who's been treated.
+const PatientsList = () => {
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    appointmentService
+      .getAll()
+      .then((res) => setAppointments(res.appointments))
+      .catch((err) => toast.error(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-sm text-slate-500">Loading patients...</p>;
+
+  const byPatient = {};
+  appointments.forEach((a) => {
+    const id = a.patient?._id;
+    if (!id) return;
+    if (!byPatient[id]) {
+      byPatient[id] = { patient: a.patient, total: 0, pending: 0, completed: 0, upcoming: 0 };
+    }
+    byPatient[id].total += 1;
+    if (a.status === 'pending') byPatient[id].pending += 1;
+    if (a.status === 'approved') byPatient[id].upcoming += 1;
+    if (a.status === 'completed') byPatient[id].completed += 1;
+  });
+  const patients = Object.values(byPatient);
+
+  return (
+    <div className="glass-card p-6">
+      <h2 className="mb-4 font-display text-lg font-semibold text-slate-800 dark:text-white">Your Patients</h2>
+      {patients.length === 0 ? (
+        <p className="text-sm text-slate-500">No patients yet — they'll show up here once someone books with you.</p>
+      ) : (
+        <div className="space-y-3">
+          {patients.map(({ patient, total, pending, upcoming, completed }) => (
+            <div
+              key={patient._id}
+              className="flex flex-col justify-between gap-2 rounded-xl border border-slate-100 p-4 dark:border-slate-800 sm:flex-row sm:items-center"
+            >
+              <div>
+                <p className="font-medium text-slate-800 dark:text-white">{patient.fullName}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{patient.email}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {total} total
+                </span>
+                {pending > 0 && <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">{pending} pending</span>}
+                {upcoming > 0 && <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">{upcoming} upcoming</span>}
+                {completed > 0 && <span className="rounded-full bg-primary-100 px-3 py-1 text-primary-700">{completed} completed</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DoctorDashboard = () => {
   return (
     <DashboardLayout links={links} title="Doctor Dashboard">
       <Routes>
         <Route index element={<Overview />} />
-        <Route path="patients" element={<div className="glass-card p-6 text-slate-500">Patient list module — coming in the next build.</div>} />
-        <Route path="settings" element={<div className="glass-card p-6 text-slate-500">Profile &amp; availability settings — coming in the next build.</div>} />
+        <Route path="patients" element={<PatientsList />} />
+        <Route
+          path="settings"
+          element={
+            <div className="space-y-6">
+              <ProfileSettingsForm />
+              <AvailabilityEditor />
+            </div>
+          }
+        />
       </Routes>
     </DashboardLayout>
   );

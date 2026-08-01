@@ -22,10 +22,11 @@ const doctorSchema = new mongoose.Schema({
     min: [0, 'Experience cannot be negative'],
     max: [70, 'Please enter a realistic value'],
   },
+  // Optional: doctors are no longer required to pick a department at signup.
+  // Admins can assign one later (e.g. via PATCH /api/doctors/:id) for search/filtering.
   department: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department',
-    required: [true, 'Department is required'],
   },
   consultationFee: {
     type: Number,
@@ -55,6 +56,16 @@ const doctorSchema = new mongoose.Schema({
   isApprovedByAdmin: {
     type: Boolean,
     default: false, // admin must vet doctor credentials before they go live
+  },
+  // Tracks the review workflow distinctly from isApprovedByAdmin so a
+  // rejected doctor isn't shown as "still pending" in the admin UI.
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+  },
+  rejectionReason: {
+    type: String,
   },
 });
 

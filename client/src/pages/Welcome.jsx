@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { FaHeartPulse, FaUserDoctor } from 'react-icons/fa6';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
 
 // First screen the app shows: brand moment + the Login / Sign Up fork.
 // Admin is intentionally not listed here - admin accounts are provisioned
@@ -8,6 +9,8 @@ import { FaHeartPulse, FaUserDoctor } from 'react-icons/fa6';
 const Welcome = () => {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+      <ThemeToggle className="absolute right-6 top-6 z-20" />
+
       {/* Floating ambient icons for a lively but subtle medical feel */}
       <FaHeartPulse className="absolute left-[8%] top-[18%] h-16 w-16 text-primary-200 dark:text-slate-800 animate-float" />
       <FaUserDoctor
@@ -26,7 +29,7 @@ const Welcome = () => {
         </div>
 
         <h1 className="font-display text-2xl font-bold text-slate-800 dark:text-white">
-          Welcome to <span className="gradient-text">City Care</span> Hospital Management System
+          Welcome to <span className="gradient-text">Hospital Management System</span>
         </h1>
         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
           Book appointments, manage care, and stay connected with your health — all in one place.

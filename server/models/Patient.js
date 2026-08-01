@@ -22,7 +22,6 @@ const patientSchema = new mongoose.Schema({
   bloodGroup: {
     type: String,
     enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-    required: [true, 'Blood group is required'],
   },
   address: {
     street: String,
@@ -32,11 +31,10 @@ const patientSchema = new mongoose.Schema({
     country: String,
   },
   emergencyContact: {
-    name: { type: String, required: [true, 'Emergency contact name is required'] },
+    name: { type: String },
     relationship: String,
     phone: {
       type: String,
-      required: [true, 'Emergency contact phone is required'],
       match: [/^\+?[0-9]{10,15}$/, 'Please provide a valid emergency contact phone'],
     },
   },

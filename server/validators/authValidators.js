@@ -25,10 +25,12 @@ exports.patientSignupRules = [
   body('dateOfBirth').isISO8601().toDate().withMessage('Please provide a valid date of birth'),
   body('gender').isIn(['male', 'female', 'other']).withMessage('Please select a valid gender'),
   body('bloodGroup')
+    .optional({ checkFalsy: true })
     .isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
     .withMessage('Please select a valid blood group'),
-  body('emergencyContact.name').notEmpty().withMessage('Emergency contact name is required'),
+  body('emergencyContact.name').optional({ checkFalsy: true }).isString(),
   body('emergencyContact.phone')
+    .optional({ checkFalsy: true })
     .matches(/^\+?[0-9]{10,15}$/)
     .withMessage('Please provide a valid emergency contact phone'),
   body('acceptedTerms').equals('true').withMessage('You must accept the terms and conditions'),
@@ -49,7 +51,7 @@ exports.doctorSignupRules = [
   body('yearsOfExperience')
     .isInt({ min: 0, max: 70 })
     .withMessage('Please provide a valid number of years of experience'),
-  body('department').notEmpty().withMessage('Department is required'),
+  body('department').isMongoId().withMessage('Please select a valid department'),
   body('acceptedTerms').equals('true').withMessage('You must accept the terms and conditions'),
 ];
 

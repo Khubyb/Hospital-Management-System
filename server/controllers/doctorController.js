@@ -1,4 +1,5 @@
 const Doctor = require('../models/Doctor');
+const Appointment = require('../models/Appointment');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -58,6 +59,68 @@ exports.getDoctorById = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, doctor });
 });
 
+const SLOT_MINUTES = 30;
+const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+const toMinutes = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+const toHHMM = (mins) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+// @desc    Get a doctor's actual bookable time slots for a given date, derived
+//          from their configured shifts, with already-booked slots removed
+// @route   GET /api/doctors/:id/available-slots?date=YYYY-MM-DD
+// @access  Public
+exports.getAvailableSlots = asyncHandler(async (req, res) => {
+  const { date } = req.query;
+  if (!date) throw new ApiError(400, 'A date is required, e.g. ?date=2026-08-05');
+
+  const doctor = await Doctor.findOne({ _id: req.params.id, role: 'doctor' });
+  if (!doctor) throw new ApiError(404, 'Doctor not found');
+
+  const dayName = DAY_NAMES[new Date(`${date}T00:00:00`).getDay()];
+  const hasConfiguredAvailability = doctor.availability && doctor.availability.length > 0;
+
+  let generated = [];
+  if (!hasConfiguredAvailability) {
+    // Doctor hasn't set up their weekly shifts yet - fall back to a generic
+    // open window so patients aren't blocked from booking entirely.
+    const FALLBACK_START = '09:00';
+    const FALLBACK_END = '17:00';
+    let start = toMinutes(FALLBACK_START);
+    const end = toMinutes(FALLBACK_END);
+    while (start + SLOT_MINUTES <= end) {
+      generated.push({ startTime: toHHMM(start), endTime: toHHMM(start + SLOT_MINUTES) });
+      start += SLOT_MINUTES;
+    }
+  } else {
+    const dayEntry = doctor.availability.find((a) => a.day === dayName);
+    if (dayEntry) {
+      dayEntry.slots.forEach((shift) => {
+        let start = toMinutes(shift.startTime);
+        const end = toMinutes(shift.endTime);
+        while (start + SLOT_MINUTES <= end) {
+          generated.push({ startTime: toHHMM(start), endTime: toHHMM(start + SLOT_MINUTES) });
+          start += SLOT_MINUTES;
+        }
+      });
+    }
+  }
+
+  // Remove slots someone else already holds (pending or approved) for that date
+  const taken = await Appointment.find({
+    doctor: req.params.id,
+    date: new Date(`${date}T00:00:00`),
+    status: { $in: ['pending', 'approved'] },
+  }).select('startTime');
+  const takenTimes = new Set(taken.map((a) => a.startTime));
+
+  const available = generated.filter((s) => !takenTimes.has(s.startTime));
+
+  res.status(200).json({ success: true, day: dayName, usingFallback: !hasConfiguredAvailability, slots: available });
+});
+
 // @desc    Update the logged-in doctor's own availability schedule
 // @route   PUT /api/doctors/availability
 // @access  Private/Doctor
@@ -74,7 +137,24 @@ exports.updateAvailability = asyncHandler(async (req, res) => {
 exports.approveDoctor = asyncHandler(async (req, res) => {
   const doctor = await Doctor.findByIdAndUpdate(
     req.params.id,
-    { isApprovedByAdmin: true },
+    { isApprovedByAdmin: true, approvalStatus: 'approved', rejectionReason: undefined },
+    { new: true }
+  ).select('-password');
+  if (!doctor) throw new ApiError(404, 'Doctor not found');
+  res.status(200).json({ success: true, doctor });
+});
+
+// @desc    Admin: reject a doctor's application, optionally with a reason
+// @route   PATCH /api/doctors/:id/reject
+// @access  Private/Admin
+exports.rejectDoctor = asyncHandler(async (req, res) => {
+  const doctor = await Doctor.findByIdAndUpdate(
+    req.params.id,
+    {
+      isApprovedByAdmin: false,
+      approvalStatus: 'rejected',
+      rejectionReason: req.body.reason || 'Application did not meet requirements',
+    },
     { new: true }
   ).select('-password');
   if (!doctor) throw new ApiError(404, 'Doctor not found');

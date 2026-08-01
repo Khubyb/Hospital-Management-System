@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -7,23 +8,53 @@ import {
   FaTooth,
   FaBrain,
   FaBone,
+  FaBaby,
+  FaRibbon,
+  FaDroplet,
+  FaLungs,
+  FaVenus,
+  FaHandDots,
+  FaEarListen,
+  FaPills,
+  FaVial,
+  FaEye,
+  FaTruckMedical,
+  FaXRay,
+  FaDumbbell,
   FaStar,
 } from 'react-icons/fa6';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
+import { departmentService } from '../services/authService';
 
-const stats = [
+// Maps each department's stored `icon` key to an actual icon component.
+// Falls back to a generic stethoscope icon for anything unrecognized.
+const ICON_MAP = {
+  general: FaStethoscope,
+  cardiology: FaHeartPulse,
+  neurology: FaBrain,
+  orthopedics: FaBone,
+  pediatrics: FaBaby,
+  dental: FaTooth,
+  oncology: FaRibbon,
+  nephrology: FaDroplet,
+  psychiatry: FaBrain,
+  pulmonology: FaLungs,
+  urology: FaDroplet,
+  gynecology: FaVenus,
+  dermatology: FaHandDots,
+  ent: FaEarListen,
+  gastroenterology: FaPills,
+  endocrinology: FaVial,
+  ophthalmology: FaEye,
+  emergency: FaTruckMedical,
+  radiology: FaXRay,
+  physiotherapy: FaDumbbell,
+};
+
+const statsBase = [
   { label: 'Patients Served', value: '25,000+' },
   { label: 'Expert Doctors', value: '180+' },
-  { label: 'Departments', value: '20+' },
-  { label: 'Years of Care', value: '15+' },
-];
-
-const services = [
-  { icon: FaStethoscope, name: 'General Medicine', desc: 'Comprehensive checkups and preventive care.' },
-  { icon: FaHeartPulse, name: 'Cardiology', desc: 'Heart health diagnostics and treatment.' },
-  { icon: FaBrain, name: 'Neurology', desc: 'Care for the brain, spine, and nervous system.' },
-  { icon: FaTooth, name: 'Dental Care', desc: 'Full-service dental and oral health.' },
-  { icon: FaBone, name: 'Orthopedics', desc: 'Bone, joint, and mobility treatment.' },
-  { icon: FaUserDoctor, name: 'Pediatrics', desc: 'Dedicated care for children of all ages.' },
+  { label: 'Years of Care', value: '10+' },
 ];
 
 const faqs = [
@@ -33,6 +64,21 @@ const faqs = [
 ];
 
 const Landing = () => {
+  const [departments, setDepartments] = useState([]);
+
+  useEffect(() => {
+    departmentService
+      .getAll()
+      .then((res) => setDepartments(res.departments || []))
+      .catch(() => setDepartments([]));
+  }, []);
+
+  const stats = [
+    ...statsBase.slice(0, 2),
+    { label: 'Departments', value: '5+' },
+    statsBase[2],
+  ];
+
   return (
     <div className="overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Navbar */}
@@ -42,11 +88,14 @@ const Landing = () => {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-cyan-500">
               <FaHeartPulse className="text-white" />
             </div>
-            <span className="font-display text-lg font-bold text-slate-800 dark:text-white">City Care</span>
+            <span className="font-display text-lg font-bold text-slate-800 dark:text-white">HMS</span>
           </div>
-          <Link to="/welcome" className="btn-primary !px-5 !py-2 text-sm">
-            Get Started
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link to="/welcome" className="btn-primary !px-5 !py-2 text-sm">
+              Get Started
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -99,23 +148,26 @@ const Landing = () => {
           Our Departments
         </h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map(({ icon: Icon, name, desc }, i) => (
-            <motion.div
-              key={name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.06 }}
-              whileHover={{ y: -6 }}
-              className="glass-card p-6"
-            >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-cyan-500">
-                <Icon className="text-white" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-slate-800 dark:text-white">{name}</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{desc}</p>
-            </motion.div>
-          ))}
+          {departments.map(({ _id, name, description, icon }, i) => {
+            const Icon = ICON_MAP[icon] || FaStethoscope;
+            return (
+              <motion.div
+                key={_id || name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ y: -6 }}
+                className="glass-card p-6"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-600 to-cyan-500">
+                  <Icon className="text-white" />
+                </div>
+                <h3 className="font-display text-lg font-semibold text-slate-800 dark:text-white">{name}</h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+              </motion.div>
+            );
+          })}
         </div>
       </section>
 
@@ -130,7 +182,7 @@ const Landing = () => {
           <p className="text-lg italic text-slate-600 dark:text-slate-300">
             "Booking an appointment took less than two minutes, and I could track everything from my dashboard."
           </p>
-          <p className="mt-4 text-sm font-semibold text-slate-800 dark:text-white">— A City Care Patient</p>
+          <p className="mt-4 text-sm font-semibold text-slate-800 dark:text-white">— A Hospital Management System Patient</p>
         </div>
       </section>
 
@@ -153,7 +205,7 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="border-t border-slate-100 bg-white px-6 py-10 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-        © {new Date().getFullYear()} City Care Hospital Management System. Built as a MERN portfolio project.
+        © {new Date().getFullYear()} Hospital Management System. Built as a MERN portfolio project.
       </footer>
     </div>
   );

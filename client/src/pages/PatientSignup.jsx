@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authService } from '../services/authService';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
 
 // Strong password rule mirrored from the backend validator, so the user
 // gets instant feedback instead of a round-trip failure.
@@ -43,7 +44,8 @@ const PatientSignup = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
+      <ThemeToggle className="absolute right-6 top-6 z-20" />
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -96,8 +98,8 @@ const PatientSignup = () => {
             </select>
           </Field>
 
-          <Field label="Blood Group" error={errors.bloodGroup}>
-            <select className="input-field" {...register('bloodGroup', { required: 'Blood group is required' })}>
+          <Field label="Blood Group (optional)" error={errors.bloodGroup}>
+            <select className="input-field" defaultValue="" {...register('bloodGroup')}>
               <option value="">Select</option>
               {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bg) => (
                 <option key={bg} value={bg}>
@@ -111,12 +113,17 @@ const PatientSignup = () => {
             <input className="input-field" placeholder="Street, City, State" {...register('addressStreet')} />
           </Field>
 
-          <Field label="Emergency Contact Name" error={errors.emergencyName}>
-            <input className="input-field" {...register('emergencyName', { required: 'Required' })} />
+          <Field label="Emergency Contact Name (optional)" error={errors.emergencyName}>
+            <input className="input-field" {...register('emergencyName')} />
           </Field>
 
-          <Field label="Emergency Contact Phone" error={errors.emergencyPhone}>
-            <input className="input-field" {...register('emergencyPhone', { required: 'Required', pattern: { value: /^\+?[0-9]{10,15}$/, message: 'Invalid phone number' } })} />
+          <Field label="Emergency Contact Phone (optional)" error={errors.emergencyPhone}>
+            <input
+              className="input-field"
+              {...register('emergencyPhone', {
+                validate: (v) => !v || /^\+?[0-9]{10,15}$/.test(v) || 'Invalid phone number',
+              })}
+            />
           </Field>
 
           <label className="col-span-full flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authService } from '../services/authService';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
 
 // Reused for both "verify email after signup" and "verify OTP during password reset".
 // The purpose is passed through location.state; defaults to email verification.
@@ -65,7 +66,8 @@ const VerifyOTP = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+      <ThemeToggle className="absolute right-6 top-6 z-20" />
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}

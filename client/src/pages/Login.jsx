@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa6';
 import { useAuth } from '../context/AuthContext.jsx';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
 
 const Login = () => {
   const { role } = useParams(); // 'patient' | 'doctor' - used only for redirect target after login
@@ -33,7 +34,8 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
+      <ThemeToggle className="absolute right-6 top-6 z-20" />
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -43,16 +45,16 @@ const Login = () => {
         <h1 className="font-display text-2xl font-bold text-slate-800 dark:text-white">
           {role === 'doctor' ? 'Doctor' : 'Patient'} Login
         </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Welcome back to City Care.</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Welcome back to Hospital Management System.</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">Email</label>
             <div className="relative">
-              <FaEnvelope className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <FaEnvelope className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
               <input
                 type="email"
-                className="input-field pl-11"
+                className="input-field pl-12"
                 placeholder="you@example.com"
                 {...register('email', { required: 'Email is required' })}
               />
@@ -63,10 +65,10 @@ const Login = () => {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">Password</label>
             <div className="relative">
-              <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <FaLock className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="input-field pl-11 pr-11"
+                className="input-field pl-12 pr-12"
                 placeholder="••••••••"
                 {...register('password', { required: 'Password is required' })}
               />

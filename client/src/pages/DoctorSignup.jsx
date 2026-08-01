@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authService, departmentService } from '../services/authService';
+import ThemeToggle from '../components/ui/ThemeToggle.jsx';
 
 const PASSWORD_PATTERN = {
   value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
@@ -24,10 +25,15 @@ const DoctorSignup = () => {
   const password = watch('password');
 
   useEffect(() => {
-    departmentService
-      .getAll()
-      .then((res) => setDepartments(res.departments))
-      .catch(() => toast.error('Could not load departments. Is the API running?'));
+    const loadDepartments = async () => {
+      try {
+        const res = await departmentService.getAll();
+        setDepartments(res.departments || []);
+      } catch {
+        // Non-critical: signup can still proceed without a department chosen
+      }
+    };
+    loadDepartments();
   }, []);
 
   const onSubmit = async (data) => {
@@ -44,7 +50,8 @@ const DoctorSignup = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 via-white to-cyan-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
+      <ThemeToggle className="absolute right-6 top-6 z-20" />
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -89,23 +96,25 @@ const DoctorSignup = () => {
             <input className="input-field" placeholder="Cardiology" {...register('specialization', { required: 'Required' })} />
           </Field>
 
+          <Field label="Department" error={errors.department}>
+            <select className="input-field" defaultValue="" {...register('department', { required: 'Please select a department' })}>
+              <option value="" disabled>
+                Select a department
+              </option>
+              {departments.map((dept) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="Qualification" error={errors.qualification}>
             <input className="input-field" placeholder="MBBS, MD" {...register('qualification', { required: 'Required' })} />
           </Field>
 
           <Field label="Years of Experience" error={errors.yearsOfExperience}>
             <input type="number" className="input-field" {...register('yearsOfExperience', { required: 'Required', min: { value: 0, message: 'Cannot be negative' } })} />
-          </Field>
-
-          <Field label="Department" error={errors.department}>
-            <select className="input-field" {...register('department', { required: 'Department is required' })}>
-              <option value="">Select department</option>
-              {departments.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
           </Field>
 
           <label className="col-span-full flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">

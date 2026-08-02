@@ -92,6 +92,7 @@ Hospital-Management-System/
 │   ├── utils/
 │   │   ├── ApiError.js
 │   │   ├── asyncHandler.js
+│   │   ├── cleanupOrphanedAppointments.js
 │   │   ├── seed.js
 │   │   ├── sendEmail.js
 │   │   └── sendTokenResponse.js
@@ -106,7 +107,7 @@ Hospital-Management-System/
 ├── package-lock.json
 └── README.md
 
-Total files: 68
+Total files: 69
 
 ================================================================================
 FILE CONTENTS
@@ -413,7 +414,7 @@ const UserDetailPanel = ({ userId, type, onBack, onChanged }) => {
                     value={form.yearsOfExperience}
                     onChange={handleChange('yearsOfExperience')}
                   />
-                  <TextField type="number" label="Consultation Fee" value={form.consultationFee} onChange={handleChange('consultationFee')} />
+                  <TextField type="number" label="Consultation Fee (PKR)" value={form.consultationFee} onChange={handleChange('consultationFee')} />
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">Department</label>
                     <select className="input-field" value={form.department} onChange={handleChange('department')}>
@@ -452,7 +453,7 @@ const UserDetailPanel = ({ userId, type, onBack, onChanged }) => {
                   <Detail label="Specialization" value={user.specialization} />
                   <Detail label="Qualification" value={user.qualification} />
                   <Detail label="Experience" value={`${user.yearsOfExperience} years`} />
-                  <Detail label="Consultation Fee" value={user.consultationFee ? `$${user.consultationFee}` : '-'} />
+                  <Detail label="Consultation Fee" value={user.consultationFee ? `PKR ${user.consultationFee}` : '-'} />
                   <Detail label="Department" value={user.department?.name || 'Unassigned'} />
                   <Detail label="Approval Status" value={user.approvalStatus} />
                 </>
@@ -659,32 +660,68 @@ const toShiftMap = (availability = []) => {
   const map = {};
   DAYS.forEach((d) => (map[d] = []));
   availability.forEach(({ day, slots }) => {
-    map[day] = (slots || []).map((s) => ({ startTime: s.startTime, endTime: s.endTime }));
+    // `saved: true` marks a shift that already exists on the server, so we
+    // know it can be cancelled immediately (via the API) instead of only
+    // being removed locally pending a "Save Availability" click.
+    map[day] = (slots || []).map((s) => ({ startTime: s.startTime, endTime: s.endTime, saved: true }));
   });
   return map;
 };
 
 const AvailabilityEditor = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [shiftMap, setShiftMap] = useState(toShiftMap(user?.availability));
   const [saving, setSaving] = useState(false);
+  const [cancellingKey, setCancellingKey] = useState(null);
 
   useEffect(() => {
     setShiftMap(toShiftMap(user?.availability));
   }, [user]);
 
   const addShift = (day) => {
-    setShiftMap((m) => ({ ...m, [day]: [...m[day], { startTime: '09:00', endTime: '12:00' }] }));
+    setShiftMap((m) => ({ ...m, [day]: [...m[day], { startTime: '09:00', endTime: '12:00', saved: false }] }));
   };
 
-  const removeShift = (day, index) => {
-    setShiftMap((m) => ({ ...m, [day]: m[day].filter((_, i) => i !== index) }));
+  // Removing a shift behaves differently depending on whether it's already
+  // saved on the server:
+  // - Not yet saved (just added / edited locally): remove it from local
+  //   state only, pending the next "Save Availability" click.
+  // - Already saved: this is a doctor saying "I'm busy that day after all" —
+  //   cancel that one shift immediately via the API, without disturbing the
+  //   rest of the saved schedule or requiring a separate Save step.
+  const removeShift = async (day, index) => {
+    const shift = shiftMap[day][index];
+    if (!shift.saved) {
+      setShiftMap((m) => ({ ...m, [day]: m[day].filter((_, i) => i !== index) }));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Cancel your ${day} shift (${shift.startTime}–${shift.endTime})? Patients will no longer be able to book you during this time.`
+    );
+    if (!confirmed) return;
+
+    const key = `${day}-${shift.startTime}-${shift.endTime}`;
+    setCancellingKey(key);
+    try {
+      const res = await doctorService.cancelAvailabilitySlot(day, shift.startTime, shift.endTime);
+      setShiftMap(toShiftMap(res.availability));
+      setUser((u) => ({ ...u, availability: res.availability }));
+      toast.success('Shift cancelled');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCancellingKey(null);
+    }
   };
 
   const updateShift = (day, index, field, value) => {
     setShiftMap((m) => ({
+      // Editing the time of an already-saved shift means it no longer
+      // matches what's on the server, so it goes back to "pending save"
+      // until the doctor hits Save Availability again.
       ...m,
-      [day]: m[day].map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+      [day]: m[day].map((s, i) => (i === index ? { ...s, [field]: value, saved: false } : s)),
     }));
   };
 
@@ -706,7 +743,15 @@ const AvailabilityEditor = () => {
 
     setSaving(true);
     try {
-      await doctorService.updateAvailability(availability);
+      const res = await doctorService.updateAvailability(availability);
+      // Previously this only showed a success toast without updating the
+      // AuthContext user, so `user.availability` stayed stale — the next
+      // time this component mounted (e.g. after navigating away and back)
+      // it would re-render from the old, empty availability and the
+      // doctor's saved schedule would appear to have vanished. Updating
+      // both local state and the shared user object fixes that.
+      setShiftMap(toShiftMap(res.availability));
+      setUser((u) => ({ ...u, availability: res.availability }));
       toast.success('Availability updated');
     } catch (err) {
       toast.error(err.message);
@@ -721,6 +766,12 @@ const AvailabilityEditor = () => {
       <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
         Set the days and hours you see patients. Add more than one shift per day if you split your hours — for
         example 9:00–12:00 in the morning and 18:00–21:00 in the evening.
+      </p>
+      <p className="mb-4 text-xs text-slate-400">
+        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Live</span> shifts are already visible
+        to patients — hit the trash icon to cancel one immediately if you're suddenly busy that day, no need to press
+        Save. <span className="font-semibold text-amber-600 dark:text-amber-400">Unsaved</span> shifts are new or
+        edited and only take effect once you click Save Availability.
       </p>
 
       <div className="space-y-4">
@@ -741,31 +792,46 @@ const AvailabilityEditor = () => {
               <p className="text-xs text-slate-400">Not available this day</p>
             ) : (
               <div className="space-y-2">
-                {shiftMap[day].map((shift, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type="time"
-                      className="input-field !py-1.5 text-sm"
-                      value={shift.startTime}
-                      onChange={(e) => updateShift(day, i, 'startTime', e.target.value)}
-                    />
-                    <span className="text-slate-400">to</span>
-                    <input
-                      type="time"
-                      className="input-field !py-1.5 text-sm"
-                      value={shift.endTime}
-                      onChange={(e) => updateShift(day, i, 'endTime', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeShift(day, i)}
-                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
-                      aria-label="Remove shift"
-                    >
-                      <FaTrash size={12} />
-                    </button>
-                  </div>
-                ))}
+                {shiftMap[day].map((shift, i) => {
+                  const key = `${day}-${shift.startTime}-${shift.endTime}`;
+                  const isCancelling = cancellingKey === key;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        className="input-field !py-1.5 text-sm"
+                        value={shift.startTime}
+                        onChange={(e) => updateShift(day, i, 'startTime', e.target.value)}
+                      />
+                      <span className="text-slate-400">to</span>
+                      <input
+                        type="time"
+                        className="input-field !py-1.5 text-sm"
+                        value={shift.endTime}
+                        onChange={(e) => updateShift(day, i, 'endTime', e.target.value)}
+                      />
+                      {shift.saved ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                          Live
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                          Unsaved
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeShift(day, i)}
+                        disabled={isCancelling}
+                        className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/40"
+                        aria-label={shift.saved ? 'Cancel this shift' : 'Remove shift'}
+                        title={shift.saved ? "Busy this day? Cancel this specific shift right away" : 'Remove this unsaved shift'}
+                      >
+                        <FaTrash size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -881,7 +947,7 @@ const ProfileSettingsForm = () => {
             <Field label="Years of Experience">
               <input type="number" min="0" className="input-field" value={form.yearsOfExperience} onChange={handleChange('yearsOfExperience')} />
             </Field>
-            <Field label="Consultation Fee">
+            <Field label="Consultation Fee (PKR)">
               <input type="number" min="0" className="input-field" value={form.consultationFee} onChange={handleChange('consultationFee')} />
             </Field>
           </>
@@ -1655,6 +1721,7 @@ const BookAppointment = () => {
   const [doctors, setDoctors] = useState([]);
   const [filters, setFilters] = useState({ department: '', search: '' });
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [showAvailability, setShowAvailability] = useState(false);
   const [form, setForm] = useState({ date: '', startTime: '', reasonForVisit: '' });
   const [slots, setSlots] = useState([]);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -1681,6 +1748,7 @@ const BookAppointment = () => {
 
   const selectDoctor = (doc) => {
     setSelectedDoctor(doc);
+    setShowAvailability(false);
     setForm({ date: '', startTime: '', reasonForVisit: '' });
     setSlots([]);
   };
@@ -1785,7 +1853,7 @@ const BookAppointment = () => {
               </p>
               <p className="mt-1 text-xs text-slate-400">{doc.department?.name}</p>
               <p className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400">
-                {doc.consultationFee ? `$${doc.consultationFee} consultation fee` : 'Fee not set'}
+                {doc.consultationFee ? `PKR ${doc.consultationFee} consultation fee` : 'Fee not set'}
               </p>
             </button>
           ))}
@@ -1800,28 +1868,37 @@ const BookAppointment = () => {
               Book with Dr. {selectedDoctor.fullName}
             </h3>
             <span className="rounded-full bg-primary-100 px-3 py-1 text-sm font-semibold text-primary-700 dark:bg-slate-800 dark:text-primary-300">
-              {selectedDoctor.consultationFee ? `$${selectedDoctor.consultationFee} per visit` : 'Fee not set'}
+              {selectedDoctor.consultationFee ? `PKR ${selectedDoctor.consultationFee} per visit` : 'Fee not set'}
             </span>
           </div>
 
-          {selectedDoctor.availability?.length > 0 ? (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {[...selectedDoctor.availability]
-                .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day))
-                .map((d) => (
-                  <span
-                    key={d.day}
-                    className="rounded-full bg-slate-100 px-3 py-1 capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                  >
-                    {d.day}: {d.slots.map((s) => `${s.startTime}-${s.endTime}`).join(', ')}
-                  </span>
-                ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              This doctor hasn't set specific hours yet — you're free to pick any time between 9:00 AM and 5:00 PM.
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowAvailability((v) => !v)}
+            className="flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400"
+          >
+            {showAvailability ? 'Hide' : 'View'} Dr. {selectedDoctor.fullName}'s weekly availability
+          </button>
+
+          {showAvailability &&
+            (selectedDoctor.availability?.length > 0 ? (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[...selectedDoctor.availability]
+                  .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day))
+                  .map((d) => (
+                    <span
+                      key={d.day}
+                      className="rounded-full bg-slate-100 px-3 py-1 capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      {d.day}: {d.slots.map((s) => `${s.startTime}-${s.endTime}`).join(', ')}
+                    </span>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                This doctor hasn't set specific hours yet — you're free to pick any time between 9:00 AM and 5:00 PM.
+              </p>
+            ))}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -3261,6 +3338,8 @@ export const doctorService = {
   getById: (id) => api.get(`/doctors/${id}`).then((r) => r.data),
   getAvailableSlots: (id, date) => api.get(`/doctors/${id}/available-slots`, { params: { date } }).then((r) => r.data),
   updateAvailability: (availability) => api.put('/doctors/availability', { availability }).then((r) => r.data),
+  cancelAvailabilitySlot: (day, startTime, endTime) =>
+    api.patch('/doctors/availability/cancel', { day, startTime, endTime }).then((r) => r.data),
 };
 
 export const appointmentService = {
@@ -9516,8 +9595,11 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI, {
-      // Modern mongoose (>=6) no longer needs useNewUrlParser/useUnifiedTopology,
-      // they are kept here commented for reference on older setups.
+      // Fail fast (10s) instead of the driver's 30s default, so connection
+      // problems (bad IP whitelist, paused cluster, blocked network) show up
+      // quickly in the terminal instead of every request silently hanging.
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
@@ -9527,10 +9609,21 @@ const connectDB = async () => {
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected. Attempting to reconnect is handled by the driver.');
+      console.warn(
+        'MongoDB disconnected — the driver will try to reconnect automatically. ' +
+          'If this persists, check that your Atlas cluster is not paused and that your current IP is allowed under Network Access.'
+      );
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      console.log('MongoDB reconnected.');
     });
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);
+    console.error(
+      'Common causes: your IP is not whitelisted in Atlas > Network Access, the cluster is paused, ' +
+        'or a firewall/VPN/antivirus is blocking outbound port 27017.'
+    );
     process.exit(1);
   }
 };
@@ -9657,7 +9750,25 @@ exports.updateUser = asyncHandler(async (req, res) => {
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndDelete(req.params.id);
   if (!user) throw new ApiError(404, 'User not found');
-  res.status(200).json({ success: true, message: `${user.fullName}'s account was deleted` });
+
+  // Deleting an account used to leave its appointments behind, pointing at
+  // a doctor/patient that no longer exists. Those "dangling" appointments
+  // would still show up on the other side's dashboard, e.g. a patient
+  // seeing a nameless "Dr. " card for a doctor an admin removed. Cleaning
+  // them up here means a deleted account disappears everywhere, not just
+  // from the admin's own list.
+  const deletedAppointments = await Appointment.deleteMany(
+    user.role === 'doctor' ? { doctor: user._id } : { patient: user._id }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: `${user.fullName}'s account was deleted${
+      deletedAppointments.deletedCount
+        ? ` along with ${deletedAppointments.deletedCount} related appointment(s)`
+        : ''
+    }`,
+  });
 });
 
 // @desc    Activate/deactivate any account (patient or doctor)
@@ -9746,7 +9857,13 @@ exports.getAppointments = asyncHandler(async (req, res) => {
     .populate('department', 'name')
     .sort('-date');
 
-  res.status(200).json({ success: true, count: appointments.length, appointments });
+  // Safety net for any appointments left over from before deleting an
+  // account also cleaned up its appointments (see adminController.deleteUser):
+  // if the referenced doctor or patient no longer exists, populate() leaves
+  // that field null. Hide those instead of rendering a broken "Dr. " card.
+  const validAppointments = appointments.filter((a) => a.patient && a.doctor);
+
+  res.status(200).json({ success: true, count: validAppointments.length, appointments: validAppointments });
 });
 
 // @desc    Update appointment status (doctor approves/rejects/completes, patient cancels)
@@ -10264,6 +10381,39 @@ exports.updateAvailability = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, availability: doctor.availability });
 });
 
+// @desc    Cancel one specific already-saved shift (e.g. doctor is suddenly busy
+//          that day) without touching the rest of their weekly schedule
+// @route   PATCH /api/doctors/availability/cancel
+// @access  Private/Doctor
+exports.cancelAvailabilitySlot = asyncHandler(async (req, res) => {
+  const { day, startTime, endTime } = req.body;
+  if (!day || !startTime || !endTime) {
+    throw new ApiError(400, 'day, startTime and endTime are required');
+  }
+
+  const doctor = await Doctor.findById(req.user._id);
+  if (!doctor) throw new ApiError(404, 'Doctor not found');
+
+  const dayEntry = doctor.availability.find((a) => a.day === day);
+  const shiftExists = dayEntry?.slots.some((s) => s.startTime === startTime && s.endTime === endTime);
+  if (!shiftExists) throw new ApiError(404, 'That shift was not found — it may have already been removed');
+
+  // Note: this only removes the recurring weekly shift so patients can no
+  // longer book new appointments in it. It does not touch appointments a
+  // patient already booked in that window — those are managed separately
+  // from the doctor's Appointments tab (approve/reject/cancel).
+  doctor.availability = doctor.availability
+    .map((a) =>
+      a.day === day
+        ? { day: a.day, slots: a.slots.filter((s) => !(s.startTime === startTime && s.endTime === endTime)) }
+        : a
+    )
+    .filter((a) => a.slots.length > 0);
+
+  await doctor.save();
+  res.status(200).json({ success: true, availability: doctor.availability });
+});
+
 // @desc    Admin: approve a doctor's credentials so they appear in search / can log in
 // @route   PATCH /api/doctors/:id/approve
 // @access  Private/Admin
@@ -10387,6 +10537,14 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === 'TokenExpiredError') {
     error.message = 'Session expired, please log in again';
     error.statusCode = 401;
+  }
+
+  // Lost/failed MongoDB connection — surface this clearly instead of a generic
+  // 500, since it's usually an Atlas Network Access / paused cluster / firewall
+  // issue rather than an application bug.
+  if (['MongooseServerSelectionError', 'MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(err.name)) {
+    error.message = 'Database connection issue — please check your MongoDB Atlas Network Access settings and that your cluster is not paused, then try again.';
+    error.statusCode = 503;
   }
 
   res.status(error.statusCode || 500).json({
@@ -10884,6 +11042,7 @@ const {
   getDoctorById,
   getAvailableSlots,
   updateAvailability,
+  cancelAvailabilitySlot,
   approveDoctor,
   rejectDoctor,
 } = require('../controllers/doctorController');
@@ -10893,6 +11052,7 @@ router.get('/', getDoctors);
 router.get('/:id', getDoctorById);
 router.get('/:id/available-slots', getAvailableSlots);
 router.put('/availability', protect, authorize('doctor'), updateAvailability);
+router.patch('/availability/cancel', protect, authorize('doctor'), cancelAvailabilitySlot);
 router.patch('/:id/approve', protect, authorize('admin'), approveDoctor);
 router.patch('/:id/reject', protect, authorize('admin'), rejectDoctor);
 
@@ -10925,6 +11085,55 @@ const asyncHandler = (fn) => (req, res, next) => {
 };
 
 module.exports = asyncHandler;
+
+
+--------------------------------------------------------------------------------
+FILE: /server/utils/cleanupOrphanedAppointments.js
+--------------------------------------------------------------------------------
+// One-time cleanup for appointments created before deleteUser started
+// cascade-deleting appointments (see adminController.deleteUser). These are
+// appointments whose doctor or patient account was already deleted, so they
+// show up as broken "Dr. " / nameless cards on dashboards.
+//
+// Run once with:  node utils/cleanupOrphanedAppointments.js
+// Safe to run more than once — it's a no-op if there's nothing orphaned left.
+
+require('dotenv').config();
+const mongoose = require('mongoose');
+const Appointment = require('../models/Appointment');
+const User = require('../models/User');
+
+const run = async () => {
+  await mongoose.connect(process.env.MONGO_URI);
+  console.log('Connected. Scanning for orphaned appointments...');
+
+  const appointments = await Appointment.find().select('doctor patient');
+  const doctorIds = [...new Set(appointments.map((a) => String(a.doctor)))];
+  const patientIds = [...new Set(appointments.map((a) => String(a.patient)))];
+
+  const existingUserIds = new Set(
+    (await User.find({ _id: { $in: [...doctorIds, ...patientIds] } }).select('_id')).map((u) => String(u._id))
+  );
+
+  const orphanedIds = appointments
+    .filter((a) => !existingUserIds.has(String(a.doctor)) || !existingUserIds.has(String(a.patient)))
+    .map((a) => a._id);
+
+  if (orphanedIds.length === 0) {
+    console.log('No orphaned appointments found. Nothing to clean up.');
+  } else {
+    const result = await Appointment.deleteMany({ _id: { $in: orphanedIds } });
+    console.log(`Deleted ${result.deletedCount} orphaned appointment(s).`);
+  }
+
+  await mongoose.disconnect();
+  process.exit(0);
+};
+
+run().catch((err) => {
+  console.error('Cleanup failed:', err.message);
+  process.exit(1);
+});
 
 
 --------------------------------------------------------------------------------
@@ -13180,7 +13389,8 @@ FILE: /server/package.json
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node utils/seed.js"
+    "seed": "node utils/seed.js",
+    "cleanup-orphaned-appointments": "node utils/cleanupOrphanedAppointments.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

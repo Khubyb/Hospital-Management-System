@@ -114,7 +114,25 @@ exports.updateUser = asyncHandler(async (req, res) => {
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndDelete(req.params.id);
   if (!user) throw new ApiError(404, 'User not found');
-  res.status(200).json({ success: true, message: `${user.fullName}'s account was deleted` });
+
+  // Deleting an account used to leave its appointments behind, pointing at
+  // a doctor/patient that no longer exists. Those "dangling" appointments
+  // would still show up on the other side's dashboard, e.g. a patient
+  // seeing a nameless "Dr. " card for a doctor an admin removed. Cleaning
+  // them up here means a deleted account disappears everywhere, not just
+  // from the admin's own list.
+  const deletedAppointments = await Appointment.deleteMany(
+    user.role === 'doctor' ? { doctor: user._id } : { patient: user._id }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: `${user.fullName}'s account was deleted${
+      deletedAppointments.deletedCount
+        ? ` along with ${deletedAppointments.deletedCount} related appointment(s)`
+        : ''
+    }`,
+  });
 });
 
 // @desc    Activate/deactivate any account (patient or doctor)

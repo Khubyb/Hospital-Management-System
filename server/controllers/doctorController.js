@@ -131,6 +131,39 @@ exports.updateAvailability = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, availability: doctor.availability });
 });
 
+// @desc    Cancel one specific already-saved shift (e.g. doctor is suddenly busy
+//          that day) without touching the rest of their weekly schedule
+// @route   PATCH /api/doctors/availability/cancel
+// @access  Private/Doctor
+exports.cancelAvailabilitySlot = asyncHandler(async (req, res) => {
+  const { day, startTime, endTime } = req.body;
+  if (!day || !startTime || !endTime) {
+    throw new ApiError(400, 'day, startTime and endTime are required');
+  }
+
+  const doctor = await Doctor.findById(req.user._id);
+  if (!doctor) throw new ApiError(404, 'Doctor not found');
+
+  const dayEntry = doctor.availability.find((a) => a.day === day);
+  const shiftExists = dayEntry?.slots.some((s) => s.startTime === startTime && s.endTime === endTime);
+  if (!shiftExists) throw new ApiError(404, 'That shift was not found — it may have already been removed');
+
+  // Note: this only removes the recurring weekly shift so patients can no
+  // longer book new appointments in it. It does not touch appointments a
+  // patient already booked in that window — those are managed separately
+  // from the doctor's Appointments tab (approve/reject/cancel).
+  doctor.availability = doctor.availability
+    .map((a) =>
+      a.day === day
+        ? { day: a.day, slots: a.slots.filter((s) => !(s.startTime === startTime && s.endTime === endTime)) }
+        : a
+    )
+    .filter((a) => a.slots.length > 0);
+
+  await doctor.save();
+  res.status(200).json({ success: true, availability: doctor.availability });
+});
+
 // @desc    Admin: approve a doctor's credentials so they appear in search / can log in
 // @route   PATCH /api/doctors/:id/approve
 // @access  Private/Admin

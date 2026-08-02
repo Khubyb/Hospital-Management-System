@@ -5,6 +5,7 @@ const {
   getDoctorById,
   getAvailableSlots,
   updateAvailability,
+  cancelAvailabilitySlot,
   approveDoctor,
   rejectDoctor,
 } = require('../controllers/doctorController');
@@ -14,6 +15,7 @@ router.get('/', getDoctors);
 router.get('/:id', getDoctorById);
 router.get('/:id/available-slots', getAvailableSlots);
 router.put('/availability', protect, authorize('doctor'), updateAvailability);
+router.patch('/availability/cancel', protect, authorize('doctor'), cancelAvailabilitySlot);
 router.patch('/:id/approve', protect, authorize('admin'), approveDoctor);
 router.patch('/:id/reject', protect, authorize('admin'), rejectDoctor);
 

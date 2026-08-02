@@ -35,6 +35,14 @@ const errorHandler = (err, req, res, next) => {
     error.statusCode = 401;
   }
 
+  // Lost/failed MongoDB connection — surface this clearly instead of a generic
+  // 500, since it's usually an Atlas Network Access / paused cluster / firewall
+  // issue rather than an application bug.
+  if (['MongooseServerSelectionError', 'MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(err.name)) {
+    error.message = 'Database connection issue — please check your MongoDB Atlas Network Access settings and that your cluster is not paused, then try again.';
+    error.statusCode = 503;
+  }
+
   res.status(error.statusCode || 500).json({
     success: false,
     message: error.message || 'Server Error',

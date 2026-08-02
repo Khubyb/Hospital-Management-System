@@ -9,6 +9,7 @@ const BookAppointment = () => {
   const [doctors, setDoctors] = useState([]);
   const [filters, setFilters] = useState({ department: '', search: '' });
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [showAvailability, setShowAvailability] = useState(false);
   const [form, setForm] = useState({ date: '', startTime: '', reasonForVisit: '' });
   const [slots, setSlots] = useState([]);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -35,6 +36,7 @@ const BookAppointment = () => {
 
   const selectDoctor = (doc) => {
     setSelectedDoctor(doc);
+    setShowAvailability(false);
     setForm({ date: '', startTime: '', reasonForVisit: '' });
     setSlots([]);
   };
@@ -139,7 +141,7 @@ const BookAppointment = () => {
               </p>
               <p className="mt-1 text-xs text-slate-400">{doc.department?.name}</p>
               <p className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400">
-                {doc.consultationFee ? `$${doc.consultationFee} consultation fee` : 'Fee not set'}
+                {doc.consultationFee ? `PKR ${doc.consultationFee} consultation fee` : 'Fee not set'}
               </p>
             </button>
           ))}
@@ -154,28 +156,37 @@ const BookAppointment = () => {
               Book with Dr. {selectedDoctor.fullName}
             </h3>
             <span className="rounded-full bg-primary-100 px-3 py-1 text-sm font-semibold text-primary-700 dark:bg-slate-800 dark:text-primary-300">
-              {selectedDoctor.consultationFee ? `$${selectedDoctor.consultationFee} per visit` : 'Fee not set'}
+              {selectedDoctor.consultationFee ? `PKR ${selectedDoctor.consultationFee} per visit` : 'Fee not set'}
             </span>
           </div>
 
-          {selectedDoctor.availability?.length > 0 ? (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {[...selectedDoctor.availability]
-                .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day))
-                .map((d) => (
-                  <span
-                    key={d.day}
-                    className="rounded-full bg-slate-100 px-3 py-1 capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                  >
-                    {d.day}: {d.slots.map((s) => `${s.startTime}-${s.endTime}`).join(', ')}
-                  </span>
-                ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              This doctor hasn't set specific hours yet — you're free to pick any time between 9:00 AM and 5:00 PM.
-            </p>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowAvailability((v) => !v)}
+            className="flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400"
+          >
+            {showAvailability ? 'Hide' : 'View'} Dr. {selectedDoctor.fullName}'s weekly availability
+          </button>
+
+          {showAvailability &&
+            (selectedDoctor.availability?.length > 0 ? (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[...selectedDoctor.availability]
+                  .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day))
+                  .map((d) => (
+                    <span
+                      key={d.day}
+                      className="rounded-full bg-slate-100 px-3 py-1 capitalize text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      {d.day}: {d.slots.map((s) => `${s.startTime}-${s.endTime}`).join(', ')}
+                    </span>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                This doctor hasn't set specific hours yet — you're free to pick any time between 9:00 AM and 5:00 PM.
+              </p>
+            ))}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

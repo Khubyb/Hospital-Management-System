@@ -70,7 +70,13 @@ exports.getAppointments = asyncHandler(async (req, res) => {
     .populate('department', 'name')
     .sort('-date');
 
-  res.status(200).json({ success: true, count: appointments.length, appointments });
+  // Safety net for any appointments left over from before deleting an
+  // account also cleaned up its appointments (see adminController.deleteUser):
+  // if the referenced doctor or patient no longer exists, populate() leaves
+  // that field null. Hide those instead of rendering a broken "Dr. " card.
+  const validAppointments = appointments.filter((a) => a.patient && a.doctor);
+
+  res.status(200).json({ success: true, count: validAppointments.length, appointments: validAppointments });
 });
 
 // @desc    Update appointment status (doctor approves/rejects/completes, patient cancels)

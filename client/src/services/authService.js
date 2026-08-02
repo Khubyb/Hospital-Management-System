@@ -22,6 +22,8 @@ export const doctorService = {
   getById: (id) => api.get(`/doctors/${id}`).then((r) => r.data),
   getAvailableSlots: (id, date) => api.get(`/doctors/${id}/available-slots`, { params: { date } }).then((r) => r.data),
   updateAvailability: (availability) => api.put('/doctors/availability', { availability }).then((r) => r.data),
+  cancelAvailabilitySlot: (day, startTime, endTime) =>
+    api.patch('/doctors/availability/cancel', { day, startTime, endTime }).then((r) => r.data),
 };
 
 export const appointmentService = {

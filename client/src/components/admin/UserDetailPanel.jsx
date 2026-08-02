@@ -204,7 +204,7 @@ const UserDetailPanel = ({ userId, type, onBack, onChanged }) => {
                     value={form.yearsOfExperience}
                     onChange={handleChange('yearsOfExperience')}
                   />
-                  <TextField type="number" label="Consultation Fee" value={form.consultationFee} onChange={handleChange('consultationFee')} />
+                  <TextField type="number" label="Consultation Fee (PKR)" value={form.consultationFee} onChange={handleChange('consultationFee')} />
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">Department</label>
                     <select className="input-field" value={form.department} onChange={handleChange('department')}>
@@ -243,7 +243,7 @@ const UserDetailPanel = ({ userId, type, onBack, onChanged }) => {
                   <Detail label="Specialization" value={user.specialization} />
                   <Detail label="Qualification" value={user.qualification} />
                   <Detail label="Experience" value={`${user.yearsOfExperience} years`} />
-                  <Detail label="Consultation Fee" value={user.consultationFee ? `$${user.consultationFee}` : '-'} />
+                  <Detail label="Consultation Fee" value={user.consultationFee ? `PKR ${user.consultationFee}` : '-'} />
                   <Detail label="Department" value={user.department?.name || 'Unassigned'} />
                   <Detail label="Approval Status" value={user.approvalStatus} />
                 </>

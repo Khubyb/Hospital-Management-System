@@ -94,7 +94,7 @@ const ProfileSettingsForm = () => {
             <Field label="Years of Experience">
               <input type="number" min="0" className="input-field" value={form.yearsOfExperience} onChange={handleChange('yearsOfExperience')} />
             </Field>
-            <Field label="Consultation Fee">
+            <Field label="Consultation Fee (PKR)">
               <input type="number" min="0" className="input-field" value={form.consultationFee} onChange={handleChange('consultationFee')} />
             </Field>
           </>
